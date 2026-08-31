@@ -1,0 +1,158 @@
+import { XMLParser } from "fast-xml-parser";
+
+const BGG_BASE = "https://boardgamegeek.com/xmlapi2";
+const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+
+export interface BggSearchResult {
+  id: number;
+  name: string;
+  yearPublished: number | null;
+}
+
+export interface BggGameDetail {
+  id: number;
+  name: string;
+  yearPublished: number | null;
+  thumbnailUrl: string | null;
+  imageUrl: string | null;
+  minPlayers: number | null;
+  maxPlayers: number | null;
+  playtimeMinutes: number | null;
+  weight: number | null;
+  bggRating: number | null;
+  categories: string[];
+  mechanisms: string[];
+  publishers: string[];
+}
+
+/** fast-xml-parser only produces an array when an element repeats; normalize to always-array. */
+function asArray<T>(value: T | T[] | undefined): T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+async function fetchBgg(pathAndQuery: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${BGG_BASE}${pathAndQuery}`, {
+    headers: { "User-Agent": "one-step-closer-to-butlerian-jihad/0.1" },
+  });
+  if (!res.ok) {
+    throw new Error(`BGG request failed (${res.status}): ${pathAndQuery}`);
+  }
+  const xml = await res.text();
+  return parser.parse(xml);
+}
+
+export async function searchGames(query: string): Promise<BggSearchResult[]> {
+  if (!query.trim()) return [];
+  const doc = await fetchBgg(`/search?query=${encodeURIComponent(query)}&type=boardgame`);
+  const items = asArray<any>((doc.items as any)?.item);
+  return items
+    .map((item) => {
+      const nameNode = Array.isArray(item.name) ? item.name[0] : item.name;
+      return {
+        id: Number(item["@_id"]),
+        name: nameNode?.["@_value"] ?? "Unknown",
+        yearPublished: item.yearpublished ? Number(item.yearpublished["@_value"]) : null,
+      };
+    })
+    .filter((r) => Number.isFinite(r.id));
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function parseGameItem(item: any): BggGameDetail {
+  const names = asArray<any>(item.name);
+  const primaryName = names.find((n) => n["@_type"] === "primary") ?? names[0];
+  const links = asArray<any>(item.link);
+  const categories = links
+    .filter((l) => l["@_type"] === "boardgamecategory")
+    .map((l) => l["@_value"] as string);
+  const mechanisms = links
+    .filter((l) => l["@_type"] === "boardgamemechanic")
+    .map((l) => l["@_value"] as string);
+  const publishers = links
+    .filter((l) => l["@_type"] === "boardgamepublisher")
+    .map((l) => l["@_value"] as string);
+
+  const ratings = item.statistics?.ratings;
+
+  return {
+    id: Number(item["@_id"]),
+    name: primaryName?.["@_value"] ?? "Unknown",
+    yearPublished: item.yearpublished ? Number(item.yearpublished["@_value"]) : null,
+    thumbnailUrl: item.thumbnail ?? null,
+    imageUrl: item.image ?? null,
+    minPlayers: item.minplayers ? Number(item.minplayers["@_value"]) : null,
+    maxPlayers: item.maxplayers ? Number(item.maxplayers["@_value"]) : null,
+    playtimeMinutes: item.playingtime ? Number(item.playingtime["@_value"]) : null,
+    weight:
+      ratings?.averageweight && Number(ratings.averageweight["@_value"]) > 0
+        ? Number(ratings.averageweight["@_value"])
+        : null,
+    bggRating:
+      ratings?.average && Number(ratings.average["@_value"]) > 0
+        ? Number(ratings.average["@_value"])
+        : null,
+    categories,
+    mechanisms,
+    publishers,
+  };
+}
+
+/** Fetch full details for a batch of BGG game ids (chunked to keep query strings reasonable). */
+export async function getGameDetails(ids: number[]): Promise<BggGameDetail[]> {
+  const results: BggGameDetail[] = [];
+  for (const batch of chunk(ids, 20)) {
+    const doc = await fetchBgg(`/thing?id=${batch.join(",")}&stats=1`);
+    const items = asArray<any>((doc.items as any)?.item);
+    results.push(...items.map(parseGameItem));
+    // Be polite to BGG's API between batches.
+    if (batch !== chunk(ids, 20).at(-1)) {
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+  return results;
+}
+
+/**
+ * Resolve the full list of boardgame ids linked to a BGG publisher via the
+ * (undocumented but stable) geekitem linked-items endpoint BGG's own publisher
+ * pages use. This is a best-effort convenience import; the manual search-and-add
+ * flow always remains available as a fallback if this endpoint ever changes shape.
+ */
+export async function getPublisherGameIds(publisherId: number): Promise<number[]> {
+  const ids = new Set<number>();
+  let page = 1;
+  // Safety cap: publisher lineups are large but finite; bail out rather than loop forever
+  // if the endpoint's pagination signal is ever misread.
+  const MAX_PAGES = 20;
+
+  while (page <= MAX_PAGES) {
+    const url =
+      `https://api.geekdo.com/api/geekitem/linkeditems?objectid=${publisherId}` +
+      `&objecttype=publisher&subtype=boardgamepublisher&linkdata_index=boardgame&pageid=${page}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "one-step-closer-to-butlerian-jihad/0.1" },
+    });
+    if (!res.ok) break;
+    const data = (await res.json()) as {
+      items?: { objectid?: string | number }[];
+      pagecount?: number;
+    };
+    const items = data.items ?? [];
+    if (items.length === 0) break;
+    for (const item of items) {
+      const id = Number(item.objectid);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    if (data.pagecount && page >= data.pagecount) break;
+    page += 1;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+
+  return Array.from(ids);
+}
