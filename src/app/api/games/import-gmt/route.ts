@@ -3,7 +3,7 @@ import { getGameDetails, getPublisherGameIds } from "@/lib/bgg";
 import { upsertGame } from "@/lib/games";
 
 export async function POST() {
-  const publisherId = Number(process.env.GMT_BGG_PUBLISHER_ID || "2050");
+  const publisherId = Number(process.env.GMT_BGG_PUBLISHER_ID || "52");
 
   let ids: number[];
   try {
@@ -26,7 +26,19 @@ export async function POST() {
     );
   }
 
-  const details = await getGameDetails(ids);
+  let details;
+  try {
+    details = await getGameDetails(ids);
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: "Could not reach BGG's game details endpoint. You can still add GMT titles individually via search.",
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      { status: 502 }
+    );
+  }
+
   for (const detail of details) {
     upsertGame(detail, "GMT Games");
   }

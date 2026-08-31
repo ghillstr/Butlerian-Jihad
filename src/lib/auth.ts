@@ -20,7 +20,9 @@ export function sessionOptions(): SessionOptions {
     password: requireSessionSecret(),
     cookieName: "bga_session",
     cookieOptions: {
-      secure: process.env.NODE_ENV === "production",
+      // Secure by default in production; set COOKIE_SECURE=false to opt out when
+      // serving over plain HTTP (e.g. no TLS-terminating domain in front yet).
+      secure: process.env.COOKIE_SECURE === "false" ? false : process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
     },

@@ -35,7 +35,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-3 text-lg font-semibold text-ink">Top rated</h2>
         {topRated.length === 0 ? (
           <p className="text-sm text-dune">
@@ -53,6 +53,55 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-ink">Browse the library</h2>
+          {games.length > 0 && (
+            <Link href="/games" className="text-sm text-dune hover:underline">
+              View all →
+            </Link>
+          )}
+        </div>
+        {games.length === 0 ? (
+          <p className="text-sm text-dune">
+            No games yet. <Link href="/games/import" className="underline">Add some</Link> to start
+            browsing.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {games.slice(0, 12).map((g) => (
+              <Link
+                key={g.id}
+                href={`/games/${g.id}`}
+                className="card block overflow-hidden text-sm"
+              >
+                {g.thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={g.thumbnail_url}
+                    alt={g.name}
+                    className="h-32 w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-32 w-full items-center justify-center bg-parchment text-dune">
+                    No image
+                  </div>
+                )}
+                <div className="p-3">
+                  <p className="mb-1 truncate font-medium text-ink">{g.name}</p>
+                  <div className="flex items-center justify-between text-xs text-dune">
+                    <span>{g.publisher ?? ""}</span>
+                    <span className="font-medium text-spice">
+                      {g.bgg_rating ? `${g.bgg_rating.toFixed(1)}/10 BGG` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
     </main>

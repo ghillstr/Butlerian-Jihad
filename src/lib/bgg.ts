@@ -9,6 +9,14 @@ export interface BggSearchResult {
   yearPublished: number | null;
 }
 
+export interface BggHotGame {
+  id: number;
+  rank: number;
+  name: string;
+  yearPublished: number | null;
+  thumbnailUrl: string | null;
+}
+
 export interface BggGameDetail {
   id: number;
   name: string;
@@ -55,6 +63,21 @@ export async function searchGames(query: string): Promise<BggSearchResult[]> {
         yearPublished: item.yearpublished ? Number(item.yearpublished["@_value"]) : null,
       };
     })
+    .filter((r) => Number.isFinite(r.id));
+}
+
+/** BGG's currently-trending boardgames, ranked; always ~50 items. */
+export async function getHotGames(): Promise<BggHotGame[]> {
+  const doc = await fetchBgg(`/hot?type=boardgame`);
+  const items = asArray<any>((doc.items as any)?.item);
+  return items
+    .map((item) => ({
+      id: Number(item["@_id"]),
+      rank: Number(item["@_rank"]),
+      name: item.name?.["@_value"] ?? "Unknown",
+      yearPublished: item.yearpublished ? Number(item.yearpublished["@_value"]) : null,
+      thumbnailUrl: item.thumbnail?.["@_value"] ?? null,
+    }))
     .filter((r) => Number.isFinite(r.id));
 }
 
@@ -138,7 +161,9 @@ export async function getPublisherGameIds(publisherId: number): Promise<number[]
     const res = await fetch(url, {
       headers: { "User-Agent": "one-step-closer-to-butlerian-jihad/0.1" },
     });
-    if (!res.ok) break;
+    if (!res.ok) {
+      throw new Error(`BGG publisher lookup failed (${res.status}): ${url}`);
+    }
     const data = (await res.json()) as {
       items?: { objectid?: string | number }[];
       pagecount?: number;
