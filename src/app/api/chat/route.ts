@@ -26,11 +26,26 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const readable = new ReadableStream<Uint8Array>({
     start(controller) {
+      let settled = false;
       stream.on("text", (text) => {
+        if (settled) return;
         controller.enqueue(encoder.encode(text));
       });
-      stream.on("end", () => controller.close());
-      stream.on("error", (err) => controller.error(err));
+      stream.on("end", () => {
+        if (settled) return;
+        settled = true;
+        controller.close();
+      });
+      stream.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        const message =
+          err instanceof Anthropic.APIError
+            ? err.message
+            : "Something went wrong talking to Claude.";
+        controller.enqueue(encoder.encode(`\n\n[Error: ${message}]`));
+        controller.close();
+      });
     },
     cancel() {
       stream.abort();
