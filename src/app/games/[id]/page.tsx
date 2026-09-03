@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getGameWithRatings, parseJsonArray } from "@/lib/games";
 import { getSession } from "@/lib/auth";
 import RateControl from "@/components/RateControl";
+import RemoveGameButton from "@/components/RemoveGameButton";
 
 export default async function GameDetailPage({
   params,
@@ -20,9 +21,12 @@ export default async function GameDetailPage({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link href="/games" className="text-sm text-dune hover:underline">
-        ← Back to library
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/games" className="text-sm text-dune hover:underline">
+          ← Back to library
+        </Link>
+        <RemoveGameButton gameId={game.id} gameName={game.name} />
+      </div>
 
       <div className="mt-4 flex flex-col gap-6 sm:flex-row">
         {game.image_url && (
