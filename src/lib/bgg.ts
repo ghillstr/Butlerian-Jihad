@@ -46,7 +46,9 @@ function asArray<T>(value: T | T[] | undefined): T[] {
  * a token under "Tokens" for it.
  */
 function bggAuthHeader(): string {
-  const token = process.env.BGG_API_TOKEN;
+  // Trim defensively - a trailing newline/space from copy-pasting the token into
+  // an env file is a common cause of BGG rejecting an otherwise-valid token.
+  const token = process.env.BGG_API_TOKEN?.trim();
   if (!token) {
     throw new Error(
       "BGG_API_TOKEN is not set. BoardGameGeek requires a registered application token for " +
@@ -65,7 +67,15 @@ async function fetchBgg(pathAndQuery: string): Promise<Record<string, unknown>> 
     },
   });
   if (!res.ok) {
-    throw new Error(`BGG request failed (${res.status}): ${pathAndQuery}`);
+    const body = (await res.text().catch(() => "")).slice(0, 300).trim();
+    const hint =
+      res.status === 401 || res.status === 403
+        ? " - check that BGG_API_TOKEN is correct (no extra whitespace) and that your " +
+          "BGG application at https://boardgamegeek.com/applications has been approved"
+        : "";
+    throw new Error(
+      `BGG request failed (${res.status}): ${pathAndQuery}${hint}${body ? ` | response: ${body}` : ""}`
+    );
   }
   const xml = await res.text();
   return parser.parse(xml);
