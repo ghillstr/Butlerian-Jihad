@@ -39,9 +39,30 @@ function asArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+/**
+ * BGG now requires a registered application + Authorization: Bearer token for
+ * XML API access (see https://boardgamegeek.com/xmlapi/using-the-xml-api).
+ * Register an application at https://boardgamegeek.com/applications and create
+ * a token under "Tokens" for it.
+ */
+function bggAuthHeader(): string {
+  const token = process.env.BGG_API_TOKEN;
+  if (!token) {
+    throw new Error(
+      "BGG_API_TOKEN is not set. BoardGameGeek requires a registered application token for " +
+        "XML API access - register at https://boardgamegeek.com/applications and set " +
+        "BGG_API_TOKEN in your environment."
+    );
+  }
+  return `Bearer ${token}`;
+}
+
 async function fetchBgg(pathAndQuery: string): Promise<Record<string, unknown>> {
   const res = await fetch(`${BGG_BASE}${pathAndQuery}`, {
-    headers: { "User-Agent": "one-step-closer-to-butlerian-jihad/0.1" },
+    headers: {
+      "User-Agent": "one-step-closer-to-butlerian-jihad/0.1",
+      Authorization: bggAuthHeader(),
+    },
   });
   if (!res.ok) {
     throw new Error(`BGG request failed (${res.status}): ${pathAndQuery}`);
@@ -146,6 +167,14 @@ export async function getGameDetails(ids: number[]): Promise<BggGameDetail[]> {
  * (undocumented but stable) geekitem linked-items endpoint BGG's own publisher
  * pages use. This is a best-effort convenience import; the manual search-and-add
  * flow always remains available as a fallback if this endpoint ever changes shape.
+ *
+ * IMPORTANT: unlike /xmlapi2, api.geekdo.com is one of BGG's private, internal
+ * endpoints. Per BGG's XML API terms (boardgamegeek.com/xmlapi/using-the-xml-api,
+ * "Using other parts of our API"): "Unless otherwise noted or authorized, we are
+ * granting no license for use of those endpoints." This function is NOT covered
+ * by an XML API application token and is used here without separate BGG
+ * authorization - it carries real ToS risk (BGG could block it or take issue
+ * with its use) and should not be treated as an officially supported integration.
  */
 export async function getPublisherGameIds(publisherId: number): Promise<number[]> {
   const ids = new Set<number>();

@@ -37,6 +37,10 @@ volume).
    - `SESSION_SECRET` — generate with `openssl rand -base64 32`.
    - `ANTHROPIC_API_KEY` — your Anthropic API key (server-side only).
    - `GMT_BGG_PUBLISHER_ID` — leave as `2050` unless BGG changes it.
+   - `BGG_API_TOKEN` — BoardGameGeek requires a registered application and an
+     Authorization Bearer token to use its XML API. Register an application at
+     https://boardgamegeek.com/applications, then create a token under
+     "Tokens" for it and paste it here.
    - `DATABASE_PATH` — defaults to `./data/app.db`.
 
 2. Install dependencies:
@@ -60,8 +64,17 @@ volume).
 ## Notes
 
 - The GMT Games bulk import uses BGG's publisher-linked-items lookup, which
-  is not part of BGG's official documented API and could change shape. If it
+  is a private/internal BGG endpoint, not part of the licensed XML API, and
+  not covered by your `BGG_API_TOKEN`. BGG's terms grant no license for use of
+  such endpoints without separate authorization, so this feature carries real
+  ToS risk and could stop working (or draw BGG's attention) at any time. If it
   ever breaks, GMT titles can still be added one at a time via the regular
-  search-and-add flow on the Add Games page.
+  search-and-add flow on the Add Games page — consider that the safer default
+  if you want to stay strictly within BGG's terms.
 - Play history / session tracking is intentionally out of scope — recommendations
   are based purely on ratings and who's attending tonight.
+- Per BGG's XML API terms, public-facing applications using their data must
+  display a "Powered by BGG" attribution linking back to BoardGameGeek — this
+  app includes a simple text attribution in the footer (`src/app/layout.tsx`).
+  If you want to use BGG's official logo asset instead, grab it from the terms
+  page and swap it in there.
