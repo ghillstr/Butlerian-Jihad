@@ -68,6 +68,7 @@ export default function GameCard({
               Group avg: {game.avg_rating ? `${game.avg_rating.toFixed(1)}/10` : "—"} (
               {game.rating_count})
             </span>
+            <span>BGG: {game.bgg_rating ? game.bgg_rating.toFixed(1) : "—"}</span>
           </div>
           <RateControl gameId={game.id} currentRating={myRating} />
         </div>
