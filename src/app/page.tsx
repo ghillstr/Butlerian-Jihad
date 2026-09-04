@@ -98,6 +98,12 @@ export default async function DashboardPage() {
                       {g.bgg_rating ? `${g.bgg_rating.toFixed(1)}/10 BGG` : "—"}
                     </span>
                   </div>
+                  <div className="mt-0.5 flex items-center justify-between text-xs text-dune">
+                    <span>Group</span>
+                    <span className="font-medium text-spice">
+                      {g.avg_rating ? `${g.avg_rating.toFixed(1)}/10` : "—"} ({g.rating_count})
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}
